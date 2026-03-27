@@ -1,0 +1,286 @@
+<div class="products-container">
+  <div class="header">
+    <h1>Products</h1>
+    <button class="btn-primary" (click)="openCreateModal()">+ Add Product</button>
+  </div>
+
+  <!-- Search and Filter Section -->
+  <div class="filters-section">
+    <div class="search-bar">
+      <input 
+        type="text" 
+        class="search-input" 
+        placeholder="Search products by name or description..."
+        [value]="searchTerm()"
+        (input)="onSearchChange($any($event.target).value)">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+    </div>
+
+    <div class="filter-controls">
+      <select class="filter-select" [value]="selectedCategory()" (change)="onCategoryChange($any($event.target).value)">
+        <option value="">All Categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Furniture">Furniture</option>
+        <option value="Clothing">Clothing</option>
+        <option value="Books">Books</option>
+        <option value="Sports">Sports</option>
+      </select>
+
+      <select class="filter-select" [value]="sortBy() + '-' + sortOrder()" (change)="onSortChange($any($event.target).value.split('-')[0], $any($event.target).value.split('-')[1])">
+        <option value="name-asc">Name (A-Z)</option>
+        <option value="name-desc">Name (Z-A)</option>
+        <option value="price-asc">Price (Low to High)</option>
+        <option value="price-desc">Price (High to Low)</option>
+        <option value="stock-asc">Stock (Low to High)</option>
+        <option value="stock-desc">Stock (High to Low)</option>
+      </select>
+
+      <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchTerm() || selectedCategory()">
+        Clear Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading()" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading products...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-container">
+    <p class="error-message">{{ error() }}</p>
+    <button class="btn-retry" (click)="loadProducts()">Retry</button>
+  </div>
+
+  <!-- Products Grid -->
+  <div *ngIf="response() && !loading() && !error()" class="products-wrapper">
+    <div class="products-info">
+      <p>Total Products: {{ response()!.totalCount }}</p>
+      <p *ngIf="response()!.totalPages > 1">Page {{ response()!.page }} of {{ response()!.totalPages }}</p>
+    </div>
+
+    <div class="products-grid" *ngIf="response()!.data?.length">
+      <div class="product-card" *ngFor="let product of response()!.data">
+        <div class="product-image" *ngIf="product.imageUrl">
+          <img [src]="product.imageUrl" [alt]="product.name" />
+        </div>
+        <div class="product-image-placeholder" *ngIf="!product.imageUrl">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+          </svg>
+        </div>
+        <div class="product-content">
+          <div class="product-header">
+            <h3>{{ product.name }}</h3>
+            <span class="badge" 
+                  [class.in-stock]="isInStock(product)" 
+                  [class.out-of-stock]="!isInStock(product)"
+                  [class.low-stock]="product.stock > 0 && product.stock < 10">
+              {{ getStockStatus(product) }}
+            </span>
+          </div>
+          <div class="product-body">
+            <p class="description" *ngIf="product.description">{{ product.description }}</p>
+            <p class="price">${{ product.price.toFixed(2) }}</p>
+            <p class="category">{{ product.category }}</p>
+            <p class="stock-info">Stock: <strong>{{ product.stock }}</strong> units</p>
+          </div>
+          <div class="product-actions">
+            <button class="btn-view" (click)="viewProduct(product)">View Details</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="!response()!.data?.length" class="no-products">
+      <p>No products found.</p>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination" *ngIf="response()!.data?.length && getTotalPages() > 1">
+      <button 
+        class="pagination-btn" 
+        (click)="previousPage()" 
+        [disabled]="currentPage() === 1">
+        ‹ Previous
+      </button>
+
+      <div class="pagination-numbers">
+        <button 
+          *ngFor="let page of getPageNumbers()"
+          class="pagination-number" 
+          [class.active]="page === currentPage()"
+          [class.ellipsis]="page === -1"
+          [disabled]="page === -1"
+          (click)="goToPage(page)">
+          {{ page === -1 ? '...' : page }}
+        </button>
+      </div>
+
+      <button 
+        class="pagination-btn" 
+        (click)="nextPage()" 
+        [disabled]="currentPage() === getTotalPages()">
+        Next ›
+      </button>
+    </div>
+
+    <div class="pagination-info" *ngIf="response()!.data?.length">
+      <p>
+        Showing {{ ((currentPage() - 1) * pageSize()) + 1 }} - 
+        {{ Math.min(currentPage() * pageSize(), response()!.totalCount) }} 
+        of {{ response()!.totalCount }} products
+      </p>
+    </div>
+  </div>
+
+  <!-- Product Details Modal -->
+  <div *ngIf="selectedProduct()" class="modal-overlay" (click)="closeDetails()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Product Details</h3>
+        <button class="close-btn" (click)="closeDetails()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="product-detail-image" *ngIf="selectedProduct()!.imageUrl">
+          <img [src]="selectedProduct()!.imageUrl" [alt]="selectedProduct()!.name" />
+        </div>
+        <div class="detail-row">
+          <label>ID:</label>
+          <span>{{ selectedProduct()!.id }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Name:</label>
+          <span>{{ selectedProduct()!.name }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Description:</label>
+          <span>{{ selectedProduct()!.description || 'No description available' }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Price:</label>
+          <span class="detail-price">${{ selectedProduct()!.price.toFixed(2) }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Category:</label>
+          <span>{{ selectedProduct()!.category }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Stock:</label>
+          <span [class.stock-low]="selectedProduct()!.stock < 10 && selectedProduct()!.stock > 0"
+                [class.stock-out]="selectedProduct()!.stock === 0">
+            {{ selectedProduct()!.stock }} units - {{ getStockStatus(selectedProduct()!) }}
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeDetails()">Close</button>
+        <button class="btn-primary" [disabled]="!isInStock(selectedProduct()!)">Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Product Modal -->
+  <div *ngIf="showCreateModal()" class="modal-overlay" (click)="closeCreateModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Create New Product</h3>
+        <button class="close-btn" (click)="closeCreateModal()">&times;</button>
+      </div>
+      <form (ngSubmit)="createProduct()" #productForm="ngForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="name">Product Name <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="name" 
+              name="name"
+              [(ngModel)]="newProduct.name" 
+              required
+              class="form-control"
+              placeholder="Enter product name">
+          </div>
+
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea 
+              id="description" 
+              name="description"
+              [(ngModel)]="newProduct.description" 
+              rows="3"
+              class="form-control"
+              placeholder="Enter product description"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="price">Price <span class="required">*</span></label>
+              <input 
+                type="number" 
+                id="price" 
+                name="price"
+                [(ngModel)]="newProduct.price" 
+                required
+                min="0"
+                step="0.01"
+                class="form-control"
+                placeholder="0.00">
+            </div>
+
+            <div class="form-group">
+              <label for="stock">Stock Quantity <span class="required">*</span></label>
+              <input 
+                type="number" 
+                id="stock" 
+                name="stock"
+                [(ngModel)]="newProduct.stock" 
+                required
+                min="0"
+                class="form-control"
+                placeholder="0">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="category">Category <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="category" 
+              name="category"
+              [(ngModel)]="newProduct.category" 
+              required
+              class="form-control"
+              placeholder="Enter category">
+          </div>
+
+          <div class="form-group">
+            <label for="imageUrl">Image URL</label>
+            <input 
+              type="url" 
+              id="imageUrl" 
+              name="imageUrl"
+              [(ngModel)]="newProduct.imageUrl" 
+              class="form-control"
+              placeholder="https://example.com/image.jpg">
+          </div>
+
+          <div *ngIf="error()" class="form-error">
+            {{ error() }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeCreateModal()">Cancel</button>
+          <button 
+            type="submit" 
+            class="btn-primary" 
+            [disabled]="!productForm.form.valid || creatingProduct()">
+            {{ creatingProduct() ? 'Creating...' : 'Create Product' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
