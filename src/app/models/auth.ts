@@ -11,8 +11,19 @@ export interface UserDto {
   role: string;
 }
 
-export interface AuthResponse {
+export interface AuthData {
   token: string;
   user: UserDto;
   expiresIn: number;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  data: AuthData;
+  message: string;
+  errors: any;
+  totalCount: number | null;
+  page: number | null;
+  pageSize: number | null;
+  totalPages: number | null;
 }

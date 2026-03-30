@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { LoginRequest } from '../../models/auth';
 
@@ -24,11 +24,16 @@ export class Login implements OnInit {
 
   private authService = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private returnUrl: string = '/dashboard';
 
   ngOnInit() {
+    // Get return URL from query params or default to dashboard
+    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+    
     // Redirect if already logged in
     if (this.authService.isLoggedIn()) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate([this.returnUrl]);
     }
   }
 
@@ -44,7 +49,11 @@ export class Login implements OnInit {
       next: (response) => {
         console.log('Login successful:', response);
         this.loading.set(false);
-        this.router.navigate(['/dashboard']);
+        
+        // Navigate to the return URL or dashboard
+        setTimeout(() => {
+          this.router.navigate([this.returnUrl]);
+        }, 100);
       },
       error: (err) => {
         console.error('Login error:', err);
